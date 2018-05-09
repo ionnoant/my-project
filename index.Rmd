@@ -1,162 +1,41 @@
 ---
-title: "Reproducible, collaborative workflow with Github and R Markdown"
-author: "Julie Lowndes"
-date: "July 13, 2016"
-output: 
-  html_document:
-    toc: true
-    toc_float: true
-    number_sections: true
-    #code_folding: hide
+title: "I swear that fire hydrant wasn't there (2 of 2)"
+date: "January 18, 2018"
+output:
+ rmarkdown::html_document:
+    theme: spacelab
 ---
+This post is a continuation of the previous post except that I’ve visualized the 50 most ticketed parking locations within the city of Toronto for 2016. The figure and data below can be interacted with, if you’d like to determine what location generates the highest amount of ticket revenue for the city.
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library(htmltools)
+```{r, cache=TRUE, echo=FALSE}
+library(ggplot2,warn.conflicts = FALSE);library(dplyr, warn.conflicts = FALSE);library(magrittr,warn.conflicts = FALSE);library(tmaptools,warn.conflicts = FALSE);
+library(tmap,warn.conflicts = FALSE);library(ggmap,warn.conflicts = FALSE);library(DT,warn.conflicts = FALSE);library(leaflet);
+Total_Fines_Locations<-read.csv("2018-01-10_Fine-locations-and-amounts.csv")
+pal <- colorQuantile("YlOrRd", NULL, n = 8)
+leaflet(data = filter(Total_Fines_Locations, location2!="2 JAMES ST")) %>%
+  #addProviderTiles(providers$MtbMap) %>%
+  #addProviderTiles(providers$Stamen.TonerLines,
+  #                 options = providerTileOptions(opacity = 0.35)) %>%
+  #addProviderTiles(providers$Stamen.TonerLabels) %>%
+  addTiles( urlTemplate = "http://{s}.tiles.wmflabs.org/bw-mapnik/{z}/{x}/{y}.png") %>%
+  addCircles(~lon, ~lat, 
+                   radius=Total_Fines_Locations$total_fines/3000,
+                  color=~pal(Total_Fines_Locations$total_fines),
+                    opacity = .5  ,
+                   popup = ~as.character(total_fines)) %>%
+               addMarkers(~lon, ~lat, popup = ~as.character(Total_Fines_Locations$location2), 
+                          label = ~as.character(Total_Fines_Locations$location2))
+
+
+
+
 ```
+```{r, echo=FALSE}
+library(dplyr, warn.conflicts = FALSE);library(magrittr,warn.conflicts = FALSE);library(tmaptools,warn.conflicts = FALSE);library(ggplot2,warn.conflicts = FALSE);
+library(tmap,warn.conflicts = FALSE);library(ggmap,warn.conflicts = FALSE);library(DT,warn.conflicts = FALSE);library(leaflet)
+datatable(select(Total_Fines_Locations,Year,location2,total_fines)
+            ,colnames = c("Year","Location","Total Fines")) %>%
+  formatCurrency(3,digits=0)
 
-# Objectives
-
-
-
-```{r, message=F, warning=F, results='hide'}
-## load libraries
-library(dplyr) # you need to have all libraries loaded within the Rmd file
-library(ggplot2) #install.packages('ggplot2')
-library(gapminder)
-
-# get range of available data
-summary(gapminder)
 ```
-
-### Scatterplot
-
-```{r, message=F, warning=F}
-# setup dataframe
-g = gapminder %>%
-  filter(year==2007) %>%   # most recent year 
-  mutate(pop_m = pop/1e6)  # population, millions
-
-# plot scatterplot of most recent year 
-s = ggplot(g, aes(x=gdpPercap, y=lifeExp)) +
-  geom_point()
-s
-
-# add aesthetic of size by population
-s = s + 
-  aes(size=pop_m)
-s
-
-# add aesthetic of color by continent
-s = s + 
-  aes(color=continent)
-s
-
-# add title, update axes labels
-s = s + 
-  ggtitle('Health & Wealth of Nations for 2007') +
-  xlab('GDP per capita ($/year)') +
-  ylab('Life expectancy (years)')
-s
-
-# label legend
-s = s + 
-  scale_colour_discrete(name='Continent') +
-  scale_size_continuous(name='Population (M)')
-s
-```
-
-**Your Turn**: Make a similar plot but for `gdpPercap`. Be sure to update the plot's aesthetic, axis label and title accordingly.
-
-### Boxplot
-
-```{r}
-# boxplot by continent
-b = ggplot(g, aes(x=continent, y=lifeExp)) +
-  geom_boxplot()
-b
-
-# match color to continents, like scatterplot
-b = b +
-  aes(fill=continent)
-b
-
-# drop legend, add title, update axes labels
-b = b +
-  theme(legend.position='none') +
-  ggtitle('Life Expectancy by Continent for 2007') +
-  xlab('Continent') +
-  ylab('Life expectancy (years)')
-b
-```
-
-## Interactive: `plotly`
-
-[ggplot2 | plotly](https://plot.ly/ggplot2/)
-
-```{r, eval = FALSE, message=F, warning=F}
-library(plotly) # install.packages('plotly')
-
-# scatterplot (Note: key=country shows up on rollover)
-s = ggplot(g, aes(x=gdpPercap, y=lifeExp, key=country)) +
-  geom_point()
-ggplotly(s) # must comment out or have eval=FALSE to knit
-
-# boxplot
-ggplotly(b) # must comment out or have eval=FALSE to knit
-```
-
-
-
-
-```{r, results='hide', message=FALSE, warning=FALSE}
-library(tmap) # install.packages('tmap')
-
-# load world spatial polygons
-data(World)
-
-# inspect values in World
-World@data %>% tbl_df()
-
-# gapminder countries not in World. skipping for now
-g %>% 
-  anti_join(World@data, by=c('country'='name')) %>% 
-  arrange(desc(pop))
-
-# World countries not in gapminder. skipping for now
-World@data %>% 
-  anti_join(g, by=c('name'='country')) %>% 
-  arrange(desc(pop_est)) %>%
-  select(iso_a3, name, pop_est)
-
-# join gapminder data to World
-World@data = World@data %>%
-  left_join(g, by=c('name'='country'))
-```
-
-```{r}
-# make map
-m = tm_shape(World) +
-    tm_polygons('lifeExp', palette='RdYlGn', id='name', title='Life expectancy (years)', auto.palette.mapping=F) +
-    tm_style_gray() + tm_format_World()
-m
-```
-
-## Interactive
-
-```{r}
-# show interactive map
-tmap_leaflet(m)
-```
-
-
-# References
-
-- [ggplot2-cheatsheet-2.0.pdf](../cheatsheets/ggplot2-cheatsheet-2.0.pdf)
-- [Interactive Plots and Maps - Environmental Informatics](http://ucsb-bren.github.io/env-info/wk06_widgets.html)
-- [Graphs with ggplot2 - Cookbook for R](http://www.cookbook-r.com/Graphs/#graphs-with-ggplot2)
-- [ggplot2 Essentials - STHDA](http://www.sthda.com/english/wiki/ggplot2-essentials)
-- [NEON Working with Geospatial Data](http://neon-workwithdata.github.io/NEON-R-Spatio-Temporal-Data-and-Management-Intro/)
-
-
 
